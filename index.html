@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Valentine?</title>
+  <style>
+    :root {
+      --pink: #ffb6c1;
+      --deep-pink: #ff5c8a;
+      --red: #e60023;
+      --text: #2b2b2b;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--pink);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .card {
+      width: min(720px, calc(100% - 32px));
+      background: rgba(255,255,255,0.35);
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 20px;
+      padding: 28px 18px;
+      text-align: center;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+      backdrop-filter: blur(6px);
+    }
+
+    h1 {
+      margin: 0 0 18px 0;
+      font-size: clamp(28px, 4vw, 44px);
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      padding: 14px 22px;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease;
+    }
+
+    button:active { transform: scale(0.98); }
+
+    #yesBtn {
+      background: var(--deep-pink);
+      color: white;
+      box-shadow: 0 10px 20px rgba(255, 92, 138, 0.35);
+    }
+
+    /* The "No" button becomes absolutely positioned so it can run away */
+    #noBtn {
+      background: rgba(255,255,255,0.85);
+      color: #222;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(70px, 70px);
+      touch-action: none;
+    }
+
+    /* Yay screen */
+    .yay {
+      display: none;
+      text-align: center;
+    }
+
+    .heart {
+      font-size: clamp(110px, 18vw, 220px);
+      color: var(--red);
+      line-height: 1;
+      margin: 0 0 8px 0;
+      filter: drop-shadow(0 12px 18px rgba(0,0,0,0.18));
+    }
+
+    .yay h2 {
+      margin: 0;
+      font-size: clamp(34px, 6vw, 64px);
+      color: #111;
+    }
+
+    .small {
+      margin-top: 10px;
+      font-size: 14px;
+      opacity: 0.75;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="askScreen">
+    <h1>Shaz Will you be my Valentine?</h1>
+    <div class="buttons">
+      <button id="yesBtn" aria-label="Yes">Yes</button>
+    </div>
+    <div class="small">(Try to click “No” 😉)</div>
+  </div>
+
+  <!-- No button lives outside the card so it can roam anywhere -->
+  <button id="noBtn" aria-label="No">No</button>
+
+  <div class="card yay" id="yayScreen">
+    <div class="heart" aria-hidden="true">❤</div>
+    <h2>Yay!!</h2>
+  </div>
+
+  <script>
+    const yesBtn = document.getElementById('yesBtn');
+    const noBtn = document.getElementById('noBtn');
+    const askScreen = document.getElementById('askScreen');
+    const yayScreen = document.getElementById('yayScreen');
+
+    // Tune these if you want
+    const AVOID_RADIUS = 120;     // how close the cursor can get before the button flees
+    const PADDING = 12;           // keep button away from screen edges
+    const MOVE_ANIM_MS = 140;     // quick hop animation time
+
+    // Place No button near the center initially
+    function placeNoInitial() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = noBtn.getBoundingClientRect();
+      const x = (vw / 2) + 90;
+      const y = (vh / 2) + 70;
+      setNoPosition(clamp(x, PADDING, vw - rect.width - PADDING),
+                    clamp(y, PADDING, vh - rect.height - PADDING));
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function setNoPosition(x, y) {
+      noBtn.style.left = x + 'px';
+      noBtn.style.top  = y + 'px';
+      noBtn.style.transform = 'none';
+    }
+
+    function randomNoPosition(awayFromX = null, awayFromY = null) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rect = noBtn.getBoundingClientRect();
+
+      let x, y, tries = 0;
+
+      do {
+        x = PADDING + Math.random() * (vw - rect.width - PADDING * 2);
+        y = PADDING + Math.random() * (vh - rect.height - PADDING * 2);
+        tries++;
+        // If we have a cursor point, keep the new position not too close to it
+      } while (
+        awayFromX !== null &&
+        awayFromY !== null &&
+        distance(x + rect.width / 2, y + rect.height / 2, awayFromX, awayFromY) < AVOID_RADIUS * 1.2 &&
+        tries < 25
+      );
+
+      return { x, y };
+    }
+
+    function distance(x1, y1, x2, y2) {
+      const dx = x1 - x2;
+      const dy = y1 - y2;
+      return Math.hypot(dx, dy);
+    }
+
+    // Run away when cursor gets close
+    function handleMouseMove(e) {
+      if (yayScreen.style.display === 'block') return;
+
+      const rect = noBtn.getBoundingClientRect();
+      const bx = rect.left + rect.width / 2;
+      const by = rect.top + rect.height / 2;
+
+      const d = distance(bx, by, e.clientX, e.clientY);
+      if (d < AVOID_RADIUS) {
+        const { x, y } = randomNoPosition(e.clientX, e.clientY);
+        noBtn.style.transition = `left ${MOVE_ANIM_MS}ms ease, top ${MOVE_ANIM_MS}ms ease`;
+        setNoPosition(x, y);
+        // remove transition after move so it feels snappy on repeated moves
+        setTimeout(() => { noBtn.style.transition = 'none'; }, MOVE_ANIM_MS);
+      }
+    }
+
+    // If they somehow click No, it still hops away
+    function handleNoClick(e) {
+      e.preventDefault();
+      const { x, y } = randomNoPosition(e.clientX, e.clientY);
+      noBtn.style.transition = `left ${MOVE_ANIM_MS}ms ease, top ${MOVE_ANIM_MS}ms ease`;
+      setNoPosition(x, y);
+      setTimeout(() => { noBtn.style.transition = 'none'; }, MOVE_ANIM_MS);
+    }
+
+    // Yes -> Yay screen
+    function handleYesClick() {
+      askScreen.style.display = 'none';
+      noBtn.style.display = 'none';
+      yayScreen.style.display = 'block';
+    }
+
+    // Touch support: move away on touchstart so mobile users get the joke too
+    function handleTouchStart(e) {
+      if (yayScreen.style.display === 'block') return;
+      const touch = e.touches && e.touches[0];
+      const px = touch ? touch.clientX : null;
+      const py = touch ? touch.clientY : null;
+      const { x, y } = randomNoPosition(px, py);
+      noBtn.style.transition = `left ${MOVE_ANIM_MS}ms ease, top ${MOVE_ANIM_MS}ms ease`;
+      setNoPosition(x, y);
+      setTimeout(() => { noBtn.style.transition = 'none'; }, MOVE_ANIM_MS);
+    }
+
+    // Wire up
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    noBtn.addEventListener('click', handleNoClick);
+    noBtn.addEventListener('touchstart', handleTouchStart, { passive: true });
+    yesBtn.addEventListener('click', handleYesClick);
+
+    window.addEventListener('resize', placeNoInitial);
+
+    // Start
+    placeNoInitial();
+  </script>
+</body>
+</html>
